@@ -128,7 +128,7 @@ def parse_receipt(results):
         normalized = re.sub(r"[^A-Z]", "", line.upper())
 
         # Summary rows are kept separately and never treated as purchased items.
-        if any(label in normalized for label in SUMMARY_LABELS):
+        if any(label in normalized.lower() for label in SUMMARY_LABELS):
             amounts = [(p, money_value(p["text"])) for p in parts]
             amounts = [(p, v) for p, v in amounts if v is not None]
             if amounts:
