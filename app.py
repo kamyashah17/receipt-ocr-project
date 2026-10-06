@@ -45,20 +45,38 @@ reader = load_reader()
 # ============================================================
 
 def order_points(points):
-    points = np.array(points, dtype="float32")
+    """
+    Safely order four receipt corner points as:
+    top-left, top-right, bottom-right, bottom-left
+    """
 
-    rect = np.zeros((4, 2), dtype="float32")
+    points = np.asarray(points, dtype=np.float32).reshape(4, 2)
 
-    s = points.sum(axis=1)
-    rect[0] = points[np.argmin(s)]       # top-left
-    rect[2] = points[np.argmax(s)]       # bottom-right
+    # Sort points by Y coordinate
+    y_sorted = points[np.argsort(points[:, 1])]
 
-    diff = np.diff(points, axis=1)
+    # Top two and bottom two
+    top = y_sorted[:2]
+    bottom = y_sorted[2:]
 
-    rect[1] = points[np.argmin(diff)]    # top-right
-    rect[3] = points[np.argmax(diff)]    # bottom-left
+    # Sort top points by X
+    top = top[np.argsort(top[:, 0])]
 
-    return rect
+    # Sort bottom points by X
+    bottom = bottom[np.argsort(bottom[:, 0])]
+
+    top_left = top[0]
+    top_right = top[1]
+
+    bottom_left = bottom[0]
+    bottom_right = bottom[1]
+
+    return np.array([
+        top_left,
+        top_right,
+        bottom_right,
+        bottom_left
+    ], dtype=np.float32)
 
 
 # ============================================================
@@ -122,7 +140,10 @@ def correct_receipt(image):
 
         if len(approx) == 4:
 
-            pts = approx.reshape(4, 2)
+           pts = np.asarray(
+    approx,
+    dtype=np.float32
+).reshape(4, 2)
 
             rect = order_points(pts)
 
@@ -170,10 +191,13 @@ def correct_receipt(image):
 
 def deskew_image(image):
     """
-    Correct small rotations/tilts.
+    Correct small rotations/tilts safely.
     """
 
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    gray = cv2.cvtColor(
+        image,
+        cv2.COLOR_BGR2GRAY
+    )
 
     edges = cv2.Canny(
         gray,
@@ -194,11 +218,12 @@ def deskew_image(image):
     if lines is None:
         return image
 
+    # Make sure lines always have shape (N, 4)
+    lines = np.asarray(lines).reshape(-1, 4)
+
     angles = []
 
-    for line in lines:
-
-        x1, y1, x2, y2 = line[0]
+    for x1, y1, x2, y2 in lines:
 
         angle = np.degrees(
             np.arctan2(
@@ -207,22 +232,25 @@ def deskew_image(image):
             )
         )
 
-        # Keep near-horizontal lines
+        # Keep mostly horizontal lines
         if abs(angle) < 20:
             angles.append(angle)
 
     if not angles:
         return image
 
-    angle = np.median(angles)
+    angle = float(np.median(angles))
 
-    # Avoid unnecessary rotation
+    # Don't rotate if already almost straight
     if abs(angle) < 0.5:
         return image
 
     h, w = image.shape[:2]
 
-    center = (w // 2, h // 2)
+    center = (
+        w // 2,
+        h // 2
+    )
 
     matrix = cv2.getRotationMatrix2D(
         center,
