@@ -86,21 +86,33 @@ def order_points(points):
 def correct_receipt(image):
     """
     Detect receipt boundary and straighten it.
-    If no suitable boundary is found, return original image.
+    If no suitable boundary is found, return the original image.
     """
 
     original = image.copy()
 
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    gray = cv2.cvtColor(
+        image,
+        cv2.COLOR_BGR2GRAY
+    )
 
-    # Reduce noise
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    blur = cv2.GaussianBlur(
+        gray,
+        (5, 5),
+        0
+    )
 
-    # Detect edges
-    edges = cv2.Canny(blur, 50, 150)
+    edges = cv2.Canny(
+        blur,
+        50,
+        150
+    )
 
-    # Close small gaps
-    kernel = np.ones((5, 5), np.uint8)
+    kernel = np.ones(
+        (5, 5),
+        np.uint8
+    )
+
     edges = cv2.morphologyEx(
         edges,
         cv2.MORPH_CLOSE,
@@ -120,17 +132,20 @@ def correct_receipt(image):
     )
 
     height, width = image.shape[:2]
+
     image_area = height * width
 
     for contour in contours[:20]:
 
         area = cv2.contourArea(contour)
 
-        # Ignore very small contours
         if area < image_area * 0.20:
             continue
 
-        perimeter = cv2.arcLength(contour, True)
+        perimeter = cv2.arcLength(
+            contour,
+            True
+        )
 
         approx = cv2.approxPolyDP(
             contour,
@@ -138,49 +153,67 @@ def correct_receipt(image):
             True
         )
 
-        if len(approx) == 4:
+        if len(approx) != 4:
+            continue
 
-           pts = np.asarray(
-    approx,
-    dtype=np.float32
-).reshape(4, 2)
+        pts = np.asarray(
+            approx,
+            dtype=np.float32
+        ).reshape(4, 2)
 
-            rect = order_points(pts)
+        rect = order_points(pts)
 
-            (tl, tr, br, bl) = rect
+        tl, tr, br, bl = rect
 
-            width_a = np.linalg.norm(br - bl)
-            width_b = np.linalg.norm(tr - tl)
+        width_a = np.linalg.norm(
+            br - bl
+        )
 
-            max_width = int(max(width_a, width_b))
+        width_b = np.linalg.norm(
+            tr - tl
+        )
 
-            height_a = np.linalg.norm(tr - br)
-            height_b = np.linalg.norm(tl - bl)
+        max_width = int(
+            max(width_a, width_b)
+        )
 
-            max_height = int(max(height_a, height_b))
+        height_a = np.linalg.norm(
+            tr - br
+        )
 
-            if max_width < 100 or max_height < 100:
-                continue
+        height_b = np.linalg.norm(
+            tl - bl
+        )
 
-            dst = np.array([
+        max_height = int(
+            max(height_a, height_b)
+        )
+
+        if max_width < 100 or max_height < 100:
+            continue
+
+        dst = np.array(
+            [
                 [0, 0],
                 [max_width - 1, 0],
                 [max_width - 1, max_height - 1],
                 [0, max_height - 1]
-            ], dtype="float32")
+            ],
+            dtype=np.float32
+        )
 
-            matrix = cv2.getPerspectiveTransform(
-                rect,
-                dst
-            )
+        matrix = cv2.getPerspectiveTransform(
+            rect,
+            dst
+        )
 
-            warped = cv2.warpPerspective(
-                image,
-                matrix,
-                (max_width, max_height)
-            )
+        warped = cv2.warpPerspective(
+            image,
+            matrix,
+            (max_width, max_height)
+        )
 
-            return warped
+        return warped
 
     return original
 
